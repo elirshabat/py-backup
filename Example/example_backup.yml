@@ -1,0 +1,16 @@
+backup_sources:
+
+  package:
+    path: /home/eliran/Dev/py-backup/pybackup
+    backup_type: variable
+    recursive: True
+
+  example:
+    path: /home/eliran/Dev/py-backup/Example
+    backup_type: incremental
+    recursive: False
+
+  file:
+    path: /home/eliran/Dev/py-backup/Example/example_backup.yml
+    backup_type: variable
+    recursive: False
