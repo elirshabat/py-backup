@@ -41,7 +41,7 @@ def sync_files(src_root, dest_root, recursive):
 		copyfile(src_path, dest_path)
 
 
-def run_backup(cfg, dest_root):
+def run_backup(cfg, dest_root, src_root):
 	content_dir = os.path.join(dest_root, "content")
 	history_dir = os.path.join(dest_root, "history")
 	if not os.path.exists(history_dir):
@@ -51,7 +51,8 @@ def run_backup(cfg, dest_root):
 		for src_name in cfg['backup_sources']:
 			dest_dir = os.path.join(content_dir, src_name)
 			src_cfg = cfg['backup_sources'][src_name]
-			sync_files(src_root=src_cfg['path'], recursive=src_cfg['recursive'], dest_root=dest_dir)
+			src_dir = os.path.abspath(os.path.join(src_root, src_cfg['path']))
+			sync_files(src_root=src_dir, recursive=src_cfg['recursive'], dest_root=dest_dir)
 			if src_cfg['backup_type'] == 'variable':
 				dest_subtree = list_subtree(dest_dir)
 				for file in dest_subtree:
@@ -62,6 +63,7 @@ def run_backup(cfg, dest_root):
 def _main():
 	config_file = args.config_file
 	dest_root = args.dest_dir
+	src_root = args.src_root
 
 	if not os.path.isdir(dest_root):
 		raise IOError("Destination dir does not exists: {}".format(dest_root))
@@ -69,13 +71,14 @@ def _main():
 	with open(config_file, "rt") as f:
 		cfg = yaml.load(f, Loader=yaml.FullLoader)
 
-	run_backup(cfg, dest_root)
+	run_backup(cfg, dest_root, src_root)
 
 
 if __name__ == '__main__':
 	arg_parser = ArgumentParser()
 	arg_parser.add_argument("--config-file", "-c", required=True, help="Path to backup config file")
 	arg_parser.add_argument("--dest-dir", "-o", required=True, help="Path to destination directory")
+	arg_parser.add_argument("--src-root", "-s", default="", help="Path to root of source directory. Assumes that all source paths in config file are relative w.r.t. this path")
 	args = arg_parser.parse_args()
 
 	_main()
