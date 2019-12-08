@@ -5,35 +5,38 @@ from tqdm import tqdm
 from shutil import copyfile
 from zipfile import ZipFile, ZIP_DEFLATED
 from datetime import datetime
-from pybackup.tools import is_newer, get_files_to_copy, relative_path, list_subtree
+from pybackup.tools import is_newer, relative_path, list_subtree
 
 
 def get_src_to_copy(src_root, dest_root, recursive):
+	src_subtree = list_subtree(src_root, recursive=recursive)
+	src_root_dir = os.path.split(src_root)[0] if os.path.isfile(src_root) else src_root
 	src_to_copy = []
-	if os.path.isfile(src_root):
-		src_path = src_root
-		src_filename = os.path.split(src_path)[1]
-		dest_path = os.path.join(dest_root, src_filename)
-		if is_newer(src_path, dest_path):
-			src_to_copy.append(src_path)
-	elif recursive:
-		for curr_src_path, _, files in os.walk(src_root):
-			curr_dest_path = os.path.abspath(os.path.join(dest_root, relative_path(curr_src_path, src_root)))
-			curr_src_files = get_files_to_copy(curr_src_path, curr_dest_path)
-			src_to_copy.extend(curr_src_files)
-	else:
-		src_dir = src_root
-		curr_src_to_copy = get_files_to_copy(src_dir, dest_root)
-		src_to_copy.extend(curr_src_to_copy)
-
+	for src_file in src_subtree:
+		rel_path = relative_path(src_file, src_root_dir)
+		dest_file = os.path.join(dest_root, rel_path)
+		if is_newer(src_file, dest_file):
+			src_to_copy.append(src_file)
 	return src_to_copy
 
 
-def sync_files(src_root, dest_root, recursive):
+def remove_deleted_files(dest_root, src_root, recursive):
+	dest_subtree = list_subtree(dest_root, recursive=recursive)
+	src_root_dir = os.path.split(src_root)[0] if os.path.isfile(src_root) else src_root
+	for dest_file in dest_subtree:
+		rel_path = relative_path(dest_file, dest_root)
+		src_file = os.path.join(src_root_dir, rel_path)
+		if not os.path.exists(src_file):
+			os.remove(dest_file)
+
+
+def sync_files(src_root, dest_root, recursive, backup_type):
+	if backup_type == "variable":
+		remove_deleted_files(dest_root, src_root, recursive)
 	src_to_copy = get_src_to_copy(src_root, dest_root, recursive)
-	src_root = os.path.split(src_root)[0] if os.path.isfile(src_root) else src_root
+	src_root_dir = os.path.split(src_root)[0] if os.path.isfile(src_root) else src_root
 	for src_path in tqdm(src_to_copy, desc="{} -> {}".format(src_root, dest_root)):
-		rel_path = relative_path(src_path, src_root)
+		rel_path = relative_path(src_path, src_root_dir)
 		dest_path = os.path.abspath(os.path.join(dest_root, rel_path))
 		dest_dir = os.path.split(dest_path)[0]
 		if not os.path.isdir(dest_dir):
@@ -46,15 +49,19 @@ def run_backup(cfg, dest_root, src_root):
 	history_dir = os.path.join(dest_root, "history")
 	if not os.path.exists(history_dir):
 		os.mkdir(history_dir)
+	if not os.path.exists(content_dir):
+		os.mkdir(content_dir)
 	archive_filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S.zip")
 	with ZipFile(os.path.join(history_dir, archive_filename), "w", compression=ZIP_DEFLATED) as zip_f:
-		for src_name in cfg['backup_sources']:
-			dest_dir = os.path.join(content_dir, src_name)
-			src_cfg = cfg['backup_sources'][src_name]
+		for dest_name in cfg['backup_sources']:
+			dest_dir = os.path.join(content_dir, dest_name)
+			if not os.path.exists(dest_dir):
+				os.mkdir(dest_dir)
+			src_cfg = cfg['backup_sources'][dest_name]
 			src_dir = os.path.abspath(os.path.join(src_root, src_cfg['path']))
-			sync_files(src_root=src_dir, recursive=src_cfg['recursive'], dest_root=dest_dir)
+			sync_files(src_root=src_dir, recursive=src_cfg['recursive'], dest_root=dest_dir, backup_type=src_cfg['backup_type'])
 			if src_cfg['backup_type'] == 'variable':
-				dest_subtree = list_subtree(dest_dir)
+				dest_subtree = list_subtree(dest_dir, recursive=True)
 				for file in dest_subtree:
 					rel_path = relative_path(file, content_dir)
 					zip_f.write(file, rel_path)
