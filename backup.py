@@ -40,22 +40,20 @@ def sync_files(src_root, dest_root, recursive, sync_type):
     src_root_dir = os.path.split(src_root)[0] if os.path.isfile(src_root) else src_root
     src_files = list_subtree(src_root, recursive=recursive)
 
-    for src_path in tqdm(src_files, desc="{} -> {}".format(src_root, dest_root)):
+    for src_path in tqdm(src_files, desc="Synchronize {} -> {}".format(src_root, dest_root)):
         rel_path = relative_path(src_path, src_root_dir)
         dest_path = os.path.abspath(os.path.join(dest_root, rel_path))
         if is_newer(src_path, dest_path):
             dest_dir = os.path.split(dest_path)[0]
             if not os.path.exists(dest_dir):
                 os.makedirs(dest_dir)
-            if not os.path.exists(dest_path) or sync_type == "variable":
-                # override existing file
-                copyfile(src_path, dest_path)
-            else:
-                # adding new file with time suffix without overriding existing file
-                time_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                dest_file_base, dest_file_ext = os.path.splitext(dest_path)
-                new_dest_path = os.path.join("{}_{}{}".format(dest_file_base, time_str, dest_file_ext))
-                copyfile(src_path, new_dest_path)
+
+            if os.path.exists(dest_path) and sync_type != "variable":
+                # TODO: use log instead of print
+                print(f"WARNING - destination file already exists in a non-variable backup - {src_path} -> {dest_path}")
+                continue
+
+            copyfile(src_path, dest_path)
 
 
 def run_backup(cfg, dest_root, src_root):
@@ -72,6 +70,7 @@ def run_backup(cfg, dest_root, src_root):
         os.mkdir(history_dir)
     if not os.path.exists(content_dir):
         os.mkdir(content_dir)
+
     archive_filename = datetime.now().strftime("%Y-%m-%d_%H-%M-%S.zip")
     with ZipFile(os.path.join(history_dir, archive_filename), "w", compression=ZIP_DEFLATED) as zip_f:
         for dest_name in cfg['backup_sources']:
@@ -84,7 +83,7 @@ def run_backup(cfg, dest_root, src_root):
                        sync_type=src_cfg['backup_type'])
             if src_cfg['backup_type'] == 'variable':
                 dest_subtree = list_subtree(dest_dir, recursive=True)
-                for file in dest_subtree:
+                for file in tqdm(dest_subtree, desc="Save {} to history".format(dest_dir)):
                     rel_path = relative_path(file, content_dir)
                     zip_f.write(file, rel_path)
 
