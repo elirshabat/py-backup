@@ -107,7 +107,7 @@ def run_backup(cfg, dest_root, src_root):
                     rel_path = relative_path(file, content_dir)
                     zip_f.write(file, rel_path)
 
-    remove_old_history(r"B:\backup\home\history")
+    remove_old_history(history_dir)
 
 
 def _main():
