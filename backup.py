@@ -5,7 +5,7 @@ from tqdm import tqdm
 from shutil import copyfile
 from zipfile import ZipFile, ZIP_DEFLATED
 from datetime import datetime
-from pybackup.tools import is_newer, relative_path, list_subtree
+from pybackup.tools import is_newer, relative_path, list_subtree, get_hist_time, list_files
 
 
 def remove_deleted_files(dest_root, src_root, recursive):
@@ -56,6 +56,26 @@ def sync_files(src_root, dest_root, recursive, sync_type):
             copyfile(src_path, dest_path)
 
 
+def remove_old_history(hist_dir, keep_last=3, expired_days=365):
+    """
+    Remove old history files from the given directory.
+    Args:
+        hist_dir: history directory.
+        keep_last: number of minimum files to keep.
+        expired_days: files older than this number of days will be removed in case it does not violate the minimum
+            history instances.
+    """
+    zip_files = [os.path.join(hist_dir, f) for f in list_files(hist_dir) if f.endswith(".zip")]
+    zip_files = sorted(zip_files, reverse=True, key=lambda f: get_hist_time(f))[keep_last:]
+
+    now = datetime.now()
+
+    for f in zip_files:
+        td = now - get_hist_time(f)
+        if td.days > expired_days:
+            os.remove(f)
+
+
 def run_backup(cfg, dest_root, src_root):
     """
     Run backup.
@@ -86,6 +106,8 @@ def run_backup(cfg, dest_root, src_root):
                 for file in tqdm(dest_subtree, desc="Save {} to history".format(dest_dir)):
                     rel_path = relative_path(file, content_dir)
                     zip_f.write(file, rel_path)
+
+    remove_old_history(r"B:\backup\home\history")
 
 
 def _main():
