@@ -41,19 +41,23 @@ def sync_files(src_root, dest_root, recursive, sync_type):
     src_files = list_subtree(src_root, recursive=recursive)
 
     for src_path in tqdm(src_files, desc="Synchronize {} -> {}".format(src_root, dest_root)):
-        rel_path = relative_path(src_path, src_root_dir)
-        dest_path = os.path.abspath(os.path.join(dest_root, rel_path))
-        if is_newer(src_path, dest_path):
-            dest_dir = os.path.split(dest_path)[0]
-            if not os.path.exists(dest_dir):
-                os.makedirs(dest_dir)
+        try:
+            rel_path = relative_path(src_path, src_root_dir)
+            dest_path = os.path.abspath(os.path.join(dest_root, rel_path))
+            if is_newer(src_path, dest_path):
+                dest_dir = os.path.split(dest_path)[0]
+                if not os.path.exists(dest_dir):
+                    os.makedirs(dest_dir)
 
-            if os.path.exists(dest_path) and sync_type != "variable":
-                # TODO: use log instead of print
-                print(f"WARNING - destination file already exists in a non-variable backup - {src_path} -> {dest_path}")
-                continue
+                if os.path.exists(dest_path) and sync_type != "variable":
+                    # TODO: use log instead of print
+                    print(f"WARNING - destination file already exists in a non-variable backup - {src_path} -> {dest_path}")
+                    continue
 
-            copyfile(src_path, dest_path)
+                copyfile(src_path, dest_path)
+
+        except:
+            print(f"ERROR - backup failed for {src_path}")
 
 
 def remove_old_history(hist_dir, keep_last=3, expired_days=365):
