@@ -1,2 +1,2 @@
-PyYAML==5.2
+PyYAML==5.4
 tqdm==4.40.1
